@@ -14,12 +14,16 @@ USAGE: mpirun -n [# number of nodes] ./mpGe [# number of nodes] [file of equatio
 int main(int argc, char** argv) {
 
     FILE *fp;
-    double *eqn, *my_eqn, *checkEqn;
+    double *eqn, *my_eqn, *checkEqn, *pivot;
     double *x;
     int size;
     int ok;
     int step;
     int source, dest;
+    int row;
+    int winnar;
+    int num_rows = 0;
+    struct Double_Int my_di, glob_di;
 
 	int i, j;
 	int my_rank;
@@ -47,6 +51,7 @@ int main(int argc, char** argv) {
     MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     my_eqn = (double *) calloc((size/num_procs+1) * (size+1), sizeof(double));
+    pivot = (double *) calloc(size+1, sizeof(double));
 
     if (0 == my_rank) {
         eqn = (double *) calloc(size * (size+1), sizeof(double));
@@ -68,6 +73,7 @@ int main(int argc, char** argv) {
 
         if (dest == my_rank) {
 
+            num_rows++;
             step = (i/num_procs)*(size+1);
 
             if (0 == my_rank) {
@@ -87,38 +93,65 @@ int main(int argc, char** argv) {
 
 
 
-    // int pivotIndex = 0;
-    // double f;
-    // int maxRow = -1;
+    int pivotIndex = 0;
+    double f;
+    int my_maxRow = -1;
 
-    // for (step = 0; step < size-1; step++) {
-    //     if (0 == my_rank && step % 50 == 0)
-    //         printf("Step %d\n", step);
-    //     /* find pivot row */
-    //     maxRow = findMaxRow(eqn, step, size);
+    for (i = 0; i < size-1; i++) {
+        if (0 == my_rank && i % 50 == 0)
+            printf("Step %d\n", i);
 
-    //     /* pre-process pivot row */
-    //     f = eqn[maxRow * (size+1) + step];
+        /* find pivot row */
+        row = i/num_procs;
+        if (my_rank < i%num_procs)
+            row++;
+        my_maxRow = par_findMaxRow(my_eqn, row, i, num_rows, size+1);
 
-    //     for (j=step; j<size+1; j++) {
-    //         eqn[maxRow * (size+1) + j] /= f;
-    //     }
+        my_di.value = fabs(my_eqn[my_maxRow*(size+1)+i]);
+        my_di.row = my_maxRow;
 
-    //     /* swap current row with pivot row */
-    //     swapRows(eqn, maxRow, step, size);    
+        MPI_Allreduce(&my_di, &glob_di, 1, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
-    //     pivotIndex = step;
 
-    //     /*
-    //     printf("Step %d New pivot: ", step);
-    //     printRow(eqn, pivotIndex, size);
-    //     */
 
-    //     /* row reduction using pivot row */
-    //     for (i=pivotIndex+1; i<size; i++) {
-    //         reduce(eqn+i*(size+1), eqn+pivotIndex*(size+1), pivotIndex, size);
-    //     }
-    // }
+
+        // need to copy to pivot and normalize row and swap with proper pivot position
+
+
+        row = glob_di.row/num_procs;
+        winnar = glob_di.row%num_procs;
+
+        if (winnar == my_rank)
+            MPI_Bcast(my_eqn+row*(size+1), size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
+        else
+            MPI_Bcast(pivot, size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
+
+
+
+
+
+        /* pre-process pivot row */
+        f = eqn[my_maxRow * (size+1) + i];
+
+        for (j=i; j<size+1; j++) {
+            eqn[my_maxRow * (size+1) + j] /= f;
+        }
+
+        /* swap current row with pivot row */
+        swapRows(eqn, my_maxRow, i, size);
+
+        pivotIndex = i;
+
+        /*
+        printf("Step %d New pivot: ", i);
+        printRow(eqn, pivotIndex, size);
+        */
+
+        /* row reduction using pivot row */
+        for (j=pivotIndex+1; j<size; j++) {
+            reduce(eqn+j*(size+1), eqn+pivotIndex*(size+1), pivotIndex, size);
+        }
+    }
 
     /* print first 23 rows of row-reduced matrix */
     /*

@@ -173,6 +173,20 @@ int findMaxRow(double *eqn, int pivotIndex, int nR) {
   
 }
 
+int par_findMaxRow(double *my_eqn, int pivotRow, int pivotCol, int nR, int nC) {
+  int i, maxI;
+  double max;
+  max = fabs(my_eqn[pivotRow * nC + pivotCol]);
+  maxI = pivotRow;
+  for (i=pivotRow+1; i<nR; i++) {
+    if (fabs(my_eqn[i*nC + pivotCol]) > max) {
+      max = fabs(my_eqn[i*nC + pivotCol]);
+      maxI = i;
+    }
+  }
+  return maxI;
+}
+
 /***
     swapRows()
 

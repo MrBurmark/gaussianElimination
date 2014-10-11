@@ -22,6 +22,7 @@ int main(int argc, char** argv) {
     int source, dest;
     int row;
     int winnar;
+    int stop;
     int num_rows = 0;
     struct Double_Int my_di, glob_di;
 
@@ -96,8 +97,11 @@ int main(int argc, char** argv) {
     int pivotIndex = 0;
     double f;
     int my_maxRow = -1;
+    stop = size/num_procs;
+    if (my_rank < size%num_procs)
+        stop++;
 
-    for (i = 0; i < size-1; i++) {
+    for (i = 0; i < size; i++) {
         if (0 == my_rank && i % 50 == 0)
             printf("Step %d\n", i);
 
@@ -105,10 +109,18 @@ int main(int argc, char** argv) {
         row = i/num_procs;
         if (my_rank < i%num_procs)
             row++;
-        my_maxRow = par_findMaxRow(my_eqn, row, i, num_rows, size+1);
 
-        my_di.value = fabs(my_eqn[my_maxRow*(size+1)+i]);
-        my_di.row = my_maxRow;
+        if (row < stop) {
+            my_maxRow = par_findMaxRow(my_eqn, row, i, num_rows, size+1);
+
+            my_di.value = fabs(my_eqn[my_maxRow*(size+1)+i]);
+
+        } else {
+            my_maxRow = -1;
+            my_di.value = -1.0;
+        }
+
+        my_di.row = my_maxRow*num_procs+my_rank;
 
         MPI_Allreduce(&my_di, &glob_di, 1, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
@@ -121,48 +133,52 @@ int main(int argc, char** argv) {
         row = glob_di.row/num_procs;
         winnar = glob_di.row%num_procs;
 
-        if (winnar == my_rank)
+        if (winnar == my_rank) {
             MPI_Bcast(my_eqn+row*(size+1), size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
-        else
+            memcpy(pivot, my_eqn+row*(size+1), (size+1)*sizeof(double));
+        } else {
             MPI_Bcast(pivot, size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
-
-
-
-
-
-        /* pre-process pivot row */
-        f = eqn[my_maxRow * (size+1) + i];
-
-        for (j=i; j<size+1; j++) {
-            eqn[my_maxRow * (size+1) + j] /= f;
         }
 
-        /* swap current row with pivot row */
-        swapRows(eqn, my_maxRow, i, size);
 
-        pivotIndex = i;
+        if (glob_di.row != i) {
+            if (my_rank == winnar && winnar == i%num_procs) {
 
-        /*
-        printf("Step %d New pivot: ", i);
-        printRow(eqn, pivotIndex, size);
-        */
+                memcpy(my_eqn+row*(size+1), my_eqn+i/num_procs*(size+1), (size+1)*sizeof(double));
+                memcpy(my_eqn+i/num_procs*(size+1), pivot, (size+1)*sizeof(double));
+
+            } else if (my_rank == winnar) {
+
+                MPI_Recv(my_eqn+row*(size+1), size+1, MPI_DOUBLE, i%num_procs, tag, MPI_COMM_WORLD, &status);
+
+            } else if (my_rank == i%num_procs) {
+
+                MPI_Send(my_eqn+i/num_procs*(size+1), size+1, MPI_DOUBLE, winnar, tag, MPI_COMM_WORLD);
+                memcpy(my_eqn+i/num_procs*(size+1), pivot, (size+1)*sizeof(double));
+
+            }
+        }
+
+        /* process pivot row */
+        if (my_rank == i%num_procs) {
+
+            f = my_eqn[i/num_procs * (size+1) + i];
+
+            for (j=i; j<size+1; j++) {
+                my_eqn[i/num_procs * (size+1) + j] /= f;
+            }
+
+        }
+
+        row = i/num_procs;
+        if (my_rank <= i%num_procs)
+            row++;
 
         /* row reduction using pivot row */
-        for (j=pivotIndex+1; j<size; j++) {
-            reduce(eqn+j*(size+1), eqn+pivotIndex*(size+1), pivotIndex, size);
+        for (j = row; j < stop; j++) {
+            reduce(my_eqn+j*(size+1), pivot, i, size+1);
         }
     }
-
-    /* print first 23 rows of row-reduced matrix */
-    /*
-    int endRow = size;
-    if (endRow > 23)
-    endRow = 23;
-
-    for (i=0; i<endRow; i++) {
-    printRow(eqn, i, size);
-    }
-    */
 
     /* Retrieve Data from all processes */
     for (i = 0; i < size; i++) {
@@ -187,6 +203,12 @@ int main(int argc, char** argv) {
             MPI_Recv(eqn+i*(size+1), size+1, MPI_DOUBLE, source, tag, MPI_COMM_WORLD, &status);
         }
     }
+
+    /* print rows of row-reduced matrix */
+    if (0 == my_rank) 
+        for (i=0; i<size; i++) 
+            printRow(eqn, i, size);
+    
 
     /* perform back substitution */
 

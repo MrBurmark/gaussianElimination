@@ -75,6 +75,18 @@ void reduce(double *myRow, double *pivotRow, int startIndex, int endIndex) {
   }
 }
 
+void par_reduce(double *myRow, double *pivot, int start, int end) {
+  int i;
+  float factor;
+
+  factor = -myRow[start]/pivot[start];
+  myRow[start] = 0.0;
+  
+  for (i = start+1; i < end; i++) {
+    myRow[i] = myRow[i] + pivot[i] * factor;
+  }
+}
+
 /***
     backSub()
 

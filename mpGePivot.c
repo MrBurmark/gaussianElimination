@@ -24,6 +24,7 @@ int main(int argc, char** argv) {
     int winnar;
     int stop;
     int num_rows = 0;
+    double t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t_t = 0.0;
     struct Double_Int my_di, glob_di;
 
 	int i, j;
@@ -56,15 +57,15 @@ int main(int argc, char** argv) {
 
     if (0 == my_rank) {
         eqn = (double *) calloc(size * (size+1), sizeof(double));
-        //checkEqn = (double *) calloc(size * (size+1), sizeof(double));
+        checkEqn = (double *) calloc(size * (size+1), sizeof(double));
         x = (double *) calloc(size, sizeof(double));
 
         readFile(eqn, size, fp);
 
         /* save copy of matrix for error checking */
-        //for (i=0; i<size * (size+1); i++) {
-        //    checkEqn[i] = eqn[i];
-        //}
+        for (i=0; i<size * (size+1); i++) {
+            checkEqn[i] = eqn[i];
+        }
     }
 
     /* Send Data to all processes */
@@ -102,8 +103,14 @@ int main(int argc, char** argv) {
         stop++;
 
     for (i = 0; i < size; i++) {
-        if (0 == my_rank && i % 50 == 0)
-            printf("Step %d\n", i);
+        // if (0 == my_rank && i % 50 == 0)
+        //     printf("Step %d\n", i);
+
+
+
+        //t_t = MPI_Wtime();
+
+
 
         /* find pivot row */
         row = i/num_procs;
@@ -124,11 +131,7 @@ int main(int argc, char** argv) {
 
         MPI_Allreduce(&my_di, &glob_di, 1, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
-
-
-
         // need to copy to pivot and normalize row and swap with proper pivot position
-
 
         row = glob_di.row/num_procs;
         winnar = glob_di.row%num_procs;
@@ -159,6 +162,11 @@ int main(int argc, char** argv) {
             }
         }
 
+        //MPI_Barrier(MPI_COMM_WORLD);
+        //t1 += t_t - (t_t=MPI_Wtime());
+
+
+
         /* process pivot row */
         if (my_rank == i%num_procs) {
 
@@ -176,9 +184,12 @@ int main(int argc, char** argv) {
 
         /* row reduction using pivot row */
         for (j = row; j < stop; j++) {
-            reduce(my_eqn+j*(size+1), pivot, i, size+1);
+            par_reduce(my_eqn+j*(size+1), pivot, i, size+1);
         }
+
     }
+
+    
 
     /* Retrieve Data from all processes */
     for (i = 0; i < size; i++) {
@@ -205,26 +216,26 @@ int main(int argc, char** argv) {
     }
 
     /* print rows of row-reduced matrix */
-    if (0 == my_rank) 
-        for (i=0; i<size; i++) 
-            printRow(eqn, i, size);
+    // if (0 == my_rank) 
+    //     for (i=0; i<size; i++) 
+    //         printRow(eqn, i, size);
     
 
     /* perform back substitution */
 
     if (0 == my_rank) {
-        backSub(x, eqn, size);
-        dumpData(x, eqn, size);
-    }
 
-    /* check solutions */
-    /*
-    ok = checkSoln(x, checkEqn, size);
-    if (ok == 1)
-    printf("All solutions are within error threshold\n");
-    else
-    printf("Some solutions are not within error threshold\n");
-    */
+        backSub(x, eqn, size);
+
+        dumpData(x, eqn, size);
+
+        /* check solutions */
+        ok = checkSoln(x, checkEqn, size);
+        if (ok == 1)
+            printf("All solutions are within error threshold\n");
+        else
+            printf("Some solutions are not within error threshold\n");
+    }
 
     MPI_Finalize(); // program will die if not last
 }

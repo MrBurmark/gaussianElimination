@@ -245,7 +245,7 @@ int main(int argc, char** argv) {
 
         t4 = MPI_Wtime() - t4;
 
-        printf("nodes: %i\ntotal time: %.9lf\ntimes to:\npivot, eliminate, gather, back-sub\n%.9lf, %.9lf, %.9lf, %.9lf\n", num_procs, t1+t2+t3+t4, t1, t2, t3, t4);
+        printf("nodes: %i\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, t1+t2+t3+t4, t1, t2, t3, t4);
 
         dumpData(x, eqn, size);
 

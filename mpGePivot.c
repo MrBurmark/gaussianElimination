@@ -2,6 +2,9 @@
 AUTHOR: 
 COMPILE: mpicc mpGePivot.c geutils.c -o mpGe -lm -O3
 USAGE: mpirun -n [# number of nodes] ./mpGe [# number of nodes] [file of equation coefficients]
+
+This file performs parallelized Gaussian Elimination with partial pivoting using MPI
+
  */
 
 #include <stdio.h>
@@ -24,7 +27,7 @@ int main(int argc, char** argv) {
     int winnar;
     int stop;
     int num_rows = 0;
-    double t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t_t = 0.0;
+    double t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t_t1 = 0.0, t_t2 = 0.0;
     struct Double_Int my_di, glob_di;
 
 	int i, j;
@@ -107,8 +110,8 @@ int main(int argc, char** argv) {
         //     printf("Step %d\n", i);
 
 
-
-        //t_t = MPI_Wtime();
+        if (0 == my_rank)
+            t_t1 = MPI_Wtime();
 
 
 
@@ -137,43 +140,44 @@ int main(int argc, char** argv) {
         winnar = glob_di.row%num_procs;
 
         if (winnar == my_rank) {
-            MPI_Bcast(my_eqn+row*(size+1), size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
-            memcpy(pivot, my_eqn+row*(size+1), (size+1)*sizeof(double));
+            MPI_Bcast(my_eqn+row*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
+            memcpy(pivot + i, my_eqn+row*(size+1) + i, (size+1 - i)*sizeof(double));
         } else {
-            MPI_Bcast(pivot, size+1, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
+            MPI_Bcast(pivot + i, size+1 - i, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
         }
 
 
         if (glob_di.row != i) {
             if (my_rank == winnar && winnar == i%num_procs) {
 
-                memcpy(my_eqn+row*(size+1), my_eqn+i/num_procs*(size+1), (size+1)*sizeof(double));
-                memcpy(my_eqn+i/num_procs*(size+1), pivot, (size+1)*sizeof(double));
+                memcpy(my_eqn+row*(size+1) + i, my_eqn+i/num_procs*(size+1) + i, (size+1 - i)*sizeof(double));
+                memcpy(my_eqn+i/num_procs*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
 
             } else if (my_rank == winnar) {
 
-                MPI_Recv(my_eqn+row*(size+1), size+1, MPI_DOUBLE, i%num_procs, tag, MPI_COMM_WORLD, &status);
+                MPI_Recv(my_eqn+row*(size+1) + i, size+1 - i, MPI_DOUBLE, i%num_procs, tag, MPI_COMM_WORLD, &status);
 
             } else if (my_rank == i%num_procs) {
 
-                MPI_Send(my_eqn+i/num_procs*(size+1), size+1, MPI_DOUBLE, winnar, tag, MPI_COMM_WORLD);
-                memcpy(my_eqn+i/num_procs*(size+1), pivot, (size+1)*sizeof(double));
+                MPI_Send(my_eqn+i/num_procs*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, tag, MPI_COMM_WORLD);
+                memcpy(my_eqn+i/num_procs*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
 
             }
         }
 
-        //MPI_Barrier(MPI_COMM_WORLD);
-        //t1 += t_t - (t_t=MPI_Wtime());
-
+        if (0 == my_rank) {
+            t_t2 = MPI_Wtime();
+            t1 += t_t2 - t_t1;
+        }
 
 
         /* process pivot row */
         if (my_rank == i%num_procs) {
 
-            f = my_eqn[i/num_procs * (size+1) + i];
+            f = 1.0 / my_eqn[i/num_procs * (size+1) + i];
 
             for (j=i; j<size+1; j++) {
-                my_eqn[i/num_procs * (size+1) + j] /= f;
+                my_eqn[i/num_procs * (size+1) + j] *= f;
             }
 
         }
@@ -187,9 +191,16 @@ int main(int argc, char** argv) {
             par_reduce(my_eqn+j*(size+1), pivot, i, size+1);
         }
 
+        if (0 == my_rank) {
+            t_t1 = MPI_Wtime();
+            t2 += t_t1 - t_t2;
+        }
+
+
     }
 
-    
+    if (0 == my_rank)
+        t3 = MPI_Wtime();
 
     /* Retrieve Data from all processes */
     for (i = 0; i < size; i++) {
@@ -215,6 +226,9 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (0 == my_rank)
+        t3 = MPI_Wtime() - t3;
+
     /* print rows of row-reduced matrix */
     // if (0 == my_rank) 
     //     for (i=0; i<size; i++) 
@@ -225,7 +239,13 @@ int main(int argc, char** argv) {
 
     if (0 == my_rank) {
 
+        t4 = MPI_Wtime();
+
         backSub(x, eqn, size);
+
+        t4 = MPI_Wtime() - t4;
+
+        printf("nodes: %i - times to pivot, eliminate, gather, back-sub\n%lf, %lf, %lf, %lf\n", num_procs, t1, t2, t3, t4);
 
         dumpData(x, eqn, size);
 

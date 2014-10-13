@@ -1,5 +1,5 @@
 /* 
-AUTHOR: 
+AUTHOR: Rachel Beasley, Jason Burmark, Moses Lee
 COMPILE: mpicc mpGePivot.c geutils.c -o mpGe -lm -O3
 USAGE: mpirun -n [# number of nodes] ./mpGe [# number of nodes] [file of equation coefficients]
 

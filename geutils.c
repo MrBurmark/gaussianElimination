@@ -13,9 +13,9 @@
 ****/
 
 void readFile(double *data, int n, FILE *fp) {
-  int i;
+  int i, ok;
   for (i=0; i< n * (n+1); i++) {
-    fscanf(fp, "%lf", &data[i]);
+    ok = fscanf(fp, "%lf", &data[i]);
   }
 }
 

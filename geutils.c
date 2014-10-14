@@ -133,7 +133,7 @@ int checkSoln(double *s, double *mat, int nR) {
       sum += s[j] * mat[i * (nR+1) + j];
     }
     diff = sum - mat[i * (nR+1) + nR];
-    if (diff >= .005 || diff < -.005) {
+    if (isnan(diff) || diff >= .005 || diff < -.005) {
       ok = 0;
       printf("Mismatch at row %d %f %f %f\n", i, diff, sum,  mat[i * (nR+1) + nR]);
     }

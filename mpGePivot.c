@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     int size;
     int ok;
     int source;
-    int row, my_row, glob_row;
+    int my_row, win_row;
     int pivot_proc;
     int winnar;
     int num_rows = 0;
@@ -115,14 +115,13 @@ int main(int argc, char** argv) {
         if (0 == my_rank)
             t_t1 = MPI_Wtime();
 
-        row = i/num_procs;
+        my_row = i/num_procs;
         pivot_proc = i%num_procs;
-
-        /* find pivot row */
-        my_row = row;
         if (my_rank < pivot_proc)
             my_row++;
 
+        /* find pivot row */
+        
         if (my_row < my_num_rows) {
             my_maxRow = par_findMaxRow(my_eqn, my_row, i, my_num_rows, size+1);
 
@@ -139,12 +138,12 @@ int main(int argc, char** argv) {
 
         // need to copy to pivot and normalize row and swap with proper pivot position
 
-        glob_row = glob_di.row/num_procs;
+        win_row = glob_di.row/num_procs;
         winnar = glob_di.row%num_procs;
 
         if (winnar == my_rank) {
-            MPI_Bcast(my_eqn+glob_row*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
-            memcpy(pivot + i, my_eqn+glob_row*(size+1) + i, (size+1 - i)*sizeof(double));
+            MPI_Bcast(my_eqn+win_row*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
+            memcpy(pivot + i, my_eqn+win_row*(size+1) + i, (size+1 - i)*sizeof(double));
         } else {
             MPI_Bcast(pivot + i, size+1 - i, MPI_DOUBLE, winnar, MPI_COMM_WORLD);
         }
@@ -153,17 +152,17 @@ int main(int argc, char** argv) {
         if (glob_di.row != i) {
             if (my_rank == winnar && winnar == pivot_proc) {
 
-                memcpy(my_eqn+glob_row*(size+1) + i, my_eqn+row*(size+1) + i, (size+1 - i)*sizeof(double));
-                memcpy(my_eqn+row*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
+                memcpy(my_eqn+win_row*(size+1) + i, my_eqn+my_row*(size+1) + i, (size+1 - i)*sizeof(double));
+                memcpy(my_eqn+my_row*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
 
             } else if (my_rank == winnar) {
 
-                MPI_Recv(my_eqn+glob_row*(size+1) + i, size+1 - i, MPI_DOUBLE, pivot_proc, tag, MPI_COMM_WORLD, &status);
+                MPI_Recv(my_eqn+win_row*(size+1) + i, size+1 - i, MPI_DOUBLE, pivot_proc, tag, MPI_COMM_WORLD, &status);
 
             } else if (my_rank == pivot_proc) {
 
-                MPI_Send(my_eqn+row*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, tag, MPI_COMM_WORLD);
-                memcpy(my_eqn+row*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
+                MPI_Send(my_eqn+my_row*(size+1) + i, size+1 - i, MPI_DOUBLE, winnar, tag, MPI_COMM_WORLD);
+                memcpy(my_eqn+my_row*(size+1) + i, pivot + i, (size+1 - i)*sizeof(double));
 
             }
         }
@@ -177,12 +176,13 @@ int main(int argc, char** argv) {
         /* process pivot row */
         if (my_rank == pivot_proc) {
 
-            f = 1.0 / my_eqn[row * (size+1) + i];
+            f = 1.0 / my_eqn[my_row * (size+1) + i];
 
             for (j=i; j<size+1; j++) {
-                my_eqn[row * (size+1) + j] *= f;
+                my_eqn[my_row * (size+1) + j] *= f;
             }
 
+            my_row++;
         }
 
         /* row reduction using pivot row */
@@ -235,9 +235,9 @@ int main(int argc, char** argv) {
         backSub(x, eqn, size);
 
         t4 = MPI_Wtime() - t4;
-        t0 = MPI_Wtime - t0;
+        t0 = MPI_Wtime() - t0;
 
-        printf("nodes: %i\ttotal time %.9lf\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, t0, t1+t2+t3+t4, t1, t2, t3, t4);
+        printf("nodes: %i\ttotal time %f\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, t0, t1+t2+t3+t4, t1, t2, t3, t4);
 
         dumpData(x, checkEqn, size);
 

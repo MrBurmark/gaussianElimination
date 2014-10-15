@@ -13,9 +13,9 @@
 ****/
 
 void readFile(double *data, int n, FILE *fp) {
-  int i;
+  int i, ok;
   for (i=0; i< n * (n+1); i++) {
-    fscanf(fp, "%lf", &data[i]);
+    ok = fscanf(fp, "%lf", &data[i]);
   }
 }
 
@@ -133,7 +133,7 @@ int checkSoln(double *s, double *mat, int nR) {
       sum += s[j] * mat[i * (nR+1) + j];
     }
     diff = sum - mat[i * (nR+1) + nR];
-    if (diff >= .005 || diff < -.005) {
+    if (isnan(diff) || diff >= .005 || diff < -.005) {
       ok = 0;
       printf("Mismatch at row %d %f %f %f\n", i, diff, sum,  mat[i * (nR+1) + nR]);
     }

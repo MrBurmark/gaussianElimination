@@ -1,4 +1,7 @@
 *.out
+*.log
+*~
+*.tmp
 mpGe
 ge
 mat2048

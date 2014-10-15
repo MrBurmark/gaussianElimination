@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
     if (0 == my_rank) {
         fp = fopen(argv[2], "r");
         ok = fscanf(fp, "%d", &size);
+        printf("got size\n");
     }
 
     MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -88,6 +89,8 @@ int main(int argc, char** argv) {
 
         readFile(eqn, size, fp);
 
+        printf("read file\n");
+
         /* save copy of matrix for error checking */
         // for (i=0; i<size * (size+1); i++) {
         //     checkEqn[i] = eqn[i];
@@ -108,8 +111,8 @@ int main(int argc, char** argv) {
         my_num_rows++;
 
     for (i = 0; i < size; i++) {
-        // if (0 == my_rank && i % 50 == 0)
-        //     printf("Step %d\n", i);
+         if (0 == my_rank && i % 50 == 0)
+             printf("Step %d\n", i);
 
 
         if (0 == my_rank)
@@ -239,7 +242,7 @@ int main(int argc, char** argv) {
 
         printf("nodes: %i\ttotal time %.9lf\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, t0, t1+t2+t3+t4, t1, t2, t3, t4);
 
-        dumpData(x, checkEqn, size);
+        dumpData(x, eqn, size);
 
         /* read in original equation */
         fclose(fp);

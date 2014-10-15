@@ -1,5 +1,6 @@
 *.out
 *.tmp
+*~
 mat2048
 mat4096
 ge

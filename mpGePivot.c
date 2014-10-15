@@ -237,9 +237,9 @@ int main(int argc, char** argv) {
         t4 = MPI_Wtime() - t4;
         t0 = MPI_Wtime() - t0;
 
-        printf("nodes: %i\ttotal time %.9lf\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, t0, t1+t2+t3+t4, t1, t2, t3, t4);
+        printf("nodes: %i\tsize %d\ttotal time %.9lf\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, size, t0, t1+t2+t3+t4, t1, t2, t3, t4);
 
-        dumpData(x, checkEqn, size);
+        dumpData(x, eqn, size);
 
         /* read in original equation */
         fclose(fp);

@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
 
     }
 
-    for (run = 0; run < 5; run++) {
+    //for (run = 0; run < 5; run++) {
 
         if (0 == my_rank) {
             fclose(fp);
@@ -101,6 +101,10 @@ int main(int argc, char** argv) {
             readFile(eqn, size, fp);
 
             printf("read file\n");
+
+            for (i = 0; i < size; i++) {
+                x[i] = 0.0;
+            }
 
             /* save copy of matrix for error checking */
             // for (i=0; i<size * (size+1); i++) {
@@ -268,7 +272,7 @@ int main(int argc, char** argv) {
             else
                 printf("Some solutions are not within error threshold\n");
         }
-    }
+    //}
 
     MPI_Finalize(); // program will die if not last
 }

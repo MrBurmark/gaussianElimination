@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     }
 
     if (0 == my_rank) {
-        eqn = (double *) malloc(size * (size+1)* sizeof(double));
+        eqn = (double *) malloc(size * (size+1)* sizeof(double)); // changed to malloc to reduce alloc time on cluster
         checkEqn = (double *) malloc(size * (size+1)* sizeof(double));
         x = (double *) malloc(size* sizeof(double));
 
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
 
     }
 
-    for (run=0; run < 5; run++) {
+    for (run = 0; run < 5; run++) {
 
         if (0 == my_rank) {
             fclose(fp);
@@ -253,20 +253,20 @@ int main(int argc, char** argv) {
 
             printf("nodes: %i\tsize %d\ttotal time %.9lf\ntotal time, pivot, eliminate, gather, back-sub\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n%.9lf\n", num_procs, size, t0, t1+t2+t3+t4, t1, t2, t3, t4);
 
-            //dumpData(x, checkEqn, size);
+            dumpData(x, eqn, size);
 
             /* read in original equation */
-            // fclose(fp);
-            // fp = fopen(argv[2], "r");
-            // ok = fscanf(fp, "%d", &size);
-            // readFile(checkEqn, size, fp);
+            fclose(fp);
+            fp = fopen(argv[2], "r");
+            ok = fscanf(fp, "%d", &size);
+            readFile(checkEqn, size, fp);
 
             /* check solutions */
-            // ok = checkSoln(x, checkEqn, size);
-            // if (ok == 1)
-            //     printf("All solutions are within error threshold\n");
-            // else
-            //     printf("Some solutions are not within error threshold\n");
+            ok = checkSoln(x, checkEqn, size);
+            if (ok == 1)
+                printf("All solutions are within error threshold\n");
+            else
+                printf("Some solutions are not within error threshold\n");
         }
     }
 
